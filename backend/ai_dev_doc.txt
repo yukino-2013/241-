@@ -1,0 +1,321 @@
+项目技术文档（面向AI助手）
+一、项目身份信息
+yaml
+项目名称: 智能运维助手
+英文名: Smart Ops Assistant
+类型: Web应用 + AI智能体
+核心目标: 通过自然语言对话查询服务器状态
+技术栈:
+  后端: Python 3.10+, LangChain, 智谱AI API, FastAPI, uvicorn
+  前端: Python 3.10+, Streamlit, requests
+  系统工具: psutil, subprocess
+  协作: Git, GitHub
+二、项目架构（供AI理解上下文）
+text
+┌─────────────────────────────────────────────────────────────┐
+│                   前端层 (Streamlit)                         │
+│  app.py: 聊天界面，用户输入问题，调用后端API                   │
+└─────────────────────────────────────────────────────────────┘
+                              │ HTTP POST /chat
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   后端层 (FastAPI)                           │
+│  main.py: 提供 /chat 接口，接收问题，返回答案                  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   智能体层 (LangChain)                       │
+│  agent.py: 初始化Agent，绑定工具，调用大模型决策               │
+└─────────────────────────────────────────────────────────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+┌───────────────┐   ┌───────────────┐   ┌───────────────┐
+│ get_cpu_usage │   │get_memory_    │   │check_service_ │
+│   工具        │   │  usage工具    │   │   status工具  │
+│ tools.py      │   │ tools.py      │   │ tools.py      │
+└───────────────┘   └───────────────┘   └───────────────┘
+        │                     │                     │
+        └─────────────────────┼─────────────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   系统层 (服务器)                            │
+│  psutil: 获取CPU/内存信息                                    │
+│  systemctl: 检查Linux服务状态                                │
+└─────────────────────────────────────────────────────────────┘
+三、核心代码结构
+文件清单
+text
+smart-ops-assistant/
+├── backend/
+│   ├── tools.py          # 工具函数：CPU/内存/服务检查
+│   ├── agent.py          # 智能体：LangChain Agent封装
+│   └── main.py           # API服务：FastAPI入口
+├── frontend/
+│   └── app.py            # 前端界面：Streamlit应用
+├── docs/
+│   └── test_cases.md     # 测试用例
+├── .env.example          # 环境变量模板
+├── .gitignore            # Git忽略文件
+└── README.md             # 项目说明
+四、各模块详细说明（供AI生成代码参考）
+模块1：tools.py（后端工具函数）
+功能：提供三个独立的系统信息查询函数。
+python
+# tools.py 完整代码模板
+import psutil
+import subprocess
+def get_cpu_usage() -> str:
+    """
+    获取CPU使用率
+    返回格式: "当前CPU使用率为{百分比}%"
+    """
+    usage = psutil.cpu_percent(interval=1)
+    return f"当前CPU使用率为{usage}%"
+def get_memory_usage() -> str:
+    """
+    获取内存使用情况
+    返回格式: "内存已使用{used_gb}GB/共{total_gb}GB，使用率{percent}%"
+    """
+    mem = psutil.virtual_memory()
+    used_gb = mem.used / (1024**3)
+    total_gb = mem.total / (1024**3)
+    percent = mem.percent
+    return f"内存已使用{used_gb:.1f}GB/共{total_gb:.1f}GB，使用率{percent}%"
+def check_service_status(service_name: str) -> str:
+    """
+    检查Linux系统服务状态
+    参数: service_name - 服务名称，如 nginx, sshd, mysql
+    返回格式: "服务{service_name}正在运行" 或 "服务{service_name}未运行"
+    """
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", service_name],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0 and result.stdout.strip() == "active":
+            return f"服务{service_name}正在运行"
+        else:
+            return f"服务{service_name}未运行"
+    except Exception as e:
+        return f"检查服务{service_name}时出错: {str(e)}"
+# 注意：如果运行环境不是Linux，可以使用以下备用函数
+def check_service_by_process_name(service_name: str) -> str:
+    """
+    基于进程名检查服务（适用于Windows/Mac）
+    """
+    for proc in psutil.process_iter(['name']):
+        if service_name.lower() in proc.info['name'].lower():
+            return f"服务{service_name}正在运行"
+    return f"服务{service_name}未运行"
+模块2：agent.py（智能体封装）
+功能：将工具函数包装成LangChain工具，创建智能体。
+python
+# agent.py 完整代码模板
+import os
+from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
+from langchain.tools import Tool
+from langchain.agents import initialize_agent, AgentType
+from tools import get_cpu_usage, get_memory_usage, check_service_status
+# 加载环境变量
+load_dotenv()
+# 初始化大模型（使用智谱AI，OpenAI兼容接口）
+llm = ChatOpenAI(
+    model="glm-4-flash",  # 智谱免费模型
+    openai_api_key=os.getenv("ZHIPU_API_KEY"),
+    openai_api_base="https://open.bigmodel.cn/api/paas/v4/",
+    temperature=0,  # 0表示确定性输出，适合工具调用
+)
+# 定义工具列表
+tools = [
+    Tool(
+        name="get_cpu_usage",
+        func=get_cpu_usage,
+        description="获取当前CPU使用率。当用户询问CPU使用情况、电脑卡不卡、系统负载时调用此工具。"
+    ),
+    Tool(
+        name="get_memory_usage",
+        func=get_memory_usage,
+        description="获取当前内存使用情况。当用户询问内存够不够、内存使用率、剩余内存时调用此工具。"
+    ),
+    Tool(
+        name="check_service_status",
+        func=check_service_status,
+        description="检查某个系统服务是否在运行。输入服务名称（如nginx、sshd、mysql）。当用户询问某个服务活着吗、运行状态时调用此工具。"
+    )
+]
+# 创建智能体
+agent = initialize_agent(
+    tools,
+    llm,
+    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    verbose=True,  # 打印思考过程，便于调试
+    max_iterations=3,  # 最多迭代3次，避免无限循环
+)
+def ask_agent(question: str) -> str:
+    """
+    对外接口：传入用户问题，返回智能体答案
+    """
+    try:
+        response = agent.run(question)
+        return response
+    except Exception as e:
+        return f"处理问题时出错: {str(e)}"
+# 测试入口（可选）
+if __name__ == "__main__":
+    while True:
+        q = input("请输入问题（输入exit退出）: ")
+        if q.lower() == "exit":
+            break
+        print(ask_agent(q))
+模块3：main.py（API服务）
+功能：提供HTTP接口，供前端调用。
+python
+# main.py 完整代码模板
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from agent import ask_agent
+app = FastAPI(title="智能运维助手API", version="1.0.0")
+# 允许跨域（前端Streamlit需要）
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 开发环境允许所有来源
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+class Question(BaseModel):
+    text: str
+@app.post("/chat")
+async def chat(question: Question):
+    """
+    接收用户问题，返回智能体答案
+    """
+    answer = ask_agent(question.text)
+    return {"answer": answer}
+@app.get("/health")
+async def health():
+    """
+    健康检查接口
+    """
+    return {"status": "ok"}
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+模块4：app.py（前端界面）
+功能：提供聊天界面，调用后端API。
+python
+# app.py 完整代码模板
+import streamlit as st
+import requests
+# 后端API地址（根据实际部署修改）
+API_URL = "http://localhost:8000/chat"
+# 页面配置
+st.set_page_config(page_title="智能运维助手", page_icon="🤖", layout="centered")
+# 标题
+st.title("🤖 智能运维助手")
+st.markdown("用自然语言查询服务器状态，例如：**CPU怎么样？**")
+# 初始化聊天历史
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+# 显示历史消息
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+# 输入框
+if prompt := st.chat_input("输入你的问题..."):
+    # 显示用户消息
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    # 调用后端API
+    with st.spinner("智能体思考中..."):
+        try:
+            response = requests.post(API_URL, json={"text": prompt}, timeout=15)
+            if response.status_code == 200:
+                answer = response.json()["answer"]
+            else:
+                answer = f"❌ 后端错误：{response.status_code}"
+        except requests.exceptions.ConnectionError:
+            answer = "❌ 无法连接到后端，请确认后端服务已启动（运行 python main.py）"
+        except requests.exceptions.Timeout:
+            answer = "⏰ 请求超时，请稍后重试"
+        except Exception as e:
+            answer = f"❌ 发生错误：{str(e)}"
+    # 显示助手回复
+    with st.chat_message("assistant"):
+        st.markdown(answer)
+    st.session_state.messages.append({"role": "assistant", "content": answer})
+五、环境配置
+.env.example 文件内容
+bash
+# 智谱AI API Key
+ZHIPU_API_KEY=your_api_key_here
+requirements.txt 文件内容
+txt
+langchain==0.1.0
+langchain-openai==0.0.5
+fastapi==0.104.1
+uvicorn==0.24.0
+psutil==5.9.6
+streamlit==1.29.0
+requests==2.31.0
+python-dotenv==1.0.0
+六、运行步骤（供AI生成指导）
+bash
+# 1. 克隆项目
+git clone <仓库地址>
+cd smart-ops-assistant
+# 2. 创建虚拟环境
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# 或 venv\Scripts\activate  # Windows
+# 3. 安装依赖
+pip install -r requirements.txt
+# 4. 配置API Key
+cp .env.example .env
+# 编辑.env文件，填入真实的API Key
+# 5. 启动后端
+cd backend
+python main.py
+# 后端运行在 http://localhost:8000
+# 6. 启动前端（新开一个终端）
+cd frontend
+streamlit run app.py
+# 前端运行在 http://localhost:8501
+七、给AI助手的指令模板
+当B或C使用AI助手时，可以这样提问：
+示例1：B问AI
+text
+我正在开发一个智能运维助手项目，前端使用Streamlit，后端API地址是 http://localhost:8000/chat。
+请帮我写一个Streamlit聊天界面，要求：
+1. 有聊天输入框
+2. 显示对话历史
+3. 调用后端API发送用户问题
+4. 处理连接错误和超时
+5. 添加加载动画
+示例2：C问AI
+text
+我正在协助开发一个智能运维助手项目，需要为后端写一个服务检查的备用函数。
+环境可能不是Linux，无法使用systemctl。
+请帮我写一个基于进程名检查服务的Python函数，使用psutil库。
+函数名：check_service_by_process_name(service_name: str) -> str
+返回格式：服务{service_name}正在运行 或 服务{service_name}未运行
+示例3：C问AI
+text
+我需要为智能运维助手项目编写测试用例，项目有三个功能：
+1. CPU查询
+2. 内存查询
+3. 服务状态检查
+请帮我列出至少6个测试场景，包括正常情况、边界情况、异常情况。
+每个场景包含：测试ID、输入、期望输出。
+八、关键注意事项（供AI理解约束）
+大模型API：使用智谱AI的 glm-4-flash 模型，通过OpenAI兼容接口调用
+工具描述：description 字段必须清晰，包含关键词（如“CPU”“内存”“服务”）
+错误处理：所有工具函数和API调用都需要try-catch
+跨平台：check_service_status 依赖Linux的 systemctl，非Linux环境需使用备用函数
+端口：后端8000，前端8501
+超时设置：API请求超时15秒，智能体最大迭代3次
