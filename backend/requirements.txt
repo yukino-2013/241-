@@ -1,9 +1,36 @@
-langchain==0.1.0
-zhipuai==2.1.5.20250825
-fastapi==0.104.1
-uvicorn==0.24.0
-psutil==5.9.6
-streamlit==1.29.0
-requests==2.31.0
-python-dotenv==1.0.0
-sniffio==1.3.1
+# 智能运维助手 - 依赖清单
+# Python 3.10 ~ 3.12 推荐（LangChain 兼容性最佳）
+# Python 3.13 需确保 numpy>=2.0.0
+
+# ── AI 框架 ──────────────────────────────
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langgraph>=0.1.0          # InMemorySaver / 对话记忆 / ReAct 图执行引擎
+
+# ── 智谱 AI SDK ──────────────────────────
+zhipuai>=2.1.5
+
+# ── Web 框架 ─────────────────────────────
+fastapi>=0.104.1
+uvicorn>=0.24.0
+
+# ── 系统监控 ─────────────────────────────
+psutil>=5.9.6
+
+# ── 前端界面 ─────────────────────────────
+streamlit>=1.29.0
+
+# ── 工具库 ───────────────────────────────
+requests>=2.31.0
+python-dotenv>=1.0.0
+sniffio>=1.3.0
+
+# ── 数据与类型 ───────────────────────────
+pydantic>=2.0.0
+typing-extensions>=4.0.0
+numpy>=2.0.0              # Python 3.13 必须 2.x；3.10-3.12 也兼容
+
+# ── 开发 / 测试（可选）────────────────────
+# pytest>=7.4.0
+# black>=23.0.0
+# flake8>=6.0.0

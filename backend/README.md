@@ -1,131 +1,226 @@
 # 智能运维助手 (Smart Ops Assistant)
 
-## 项目简介
-通过自然语言对话查询服务器状态（CPU、内存、服务运行情况）的AI智能体。
+基于 **LangChain 1.x + 智谱AI GLM-4** 的高级智能运维助手，通过自然语言对话进行服务器状态查询，支持多轮记忆、ReAct 推理引擎和自动化运维扩展。
 
-## 技术栈
-- 后端：Python + 智谱AI API + FastAPI（优化版）
-- 前端：Streamlit
-- 系统工具：psutil, subprocess
-- 协作：Git + GitHub
+---
 
 ## 核心特性
-- **真正的AI智能体**：理解自然语言，智能调用工具
-- **优化输出**：减少冗余信息，简洁高效
-- **单例模式**：智能体只初始化一次，避免重复启动信息
-- **生产就绪**：代码优化，文档完整
 
-## 三人分工
-- **A角色**：后端核心 - 工具函数、智能体封装、API接口
-- **B角色**：前端界面 - Streamlit聊天界面
-- **C角色**：辅助开发 + 测试 + 文档
+- **LangChain ReAct 智能体**：推理-行动-观察三段式高级模式，真正理解自然语言意图并选择工具
+- **多轮对话记忆**：基于 `InMemorySaver`，同一 `thread_id` 内上下文全程保持
+- **系统监控工具链**：CPU 使用率、内存使用情况、服务状态检查、系统健康综合评估
+- **可扩展架构**：预留 OpenCALW 等自动化运维工具集成接口
+- **单例模式优化**：智能体只初始化一次，后续调用无额外开销
+- **生产就绪**：完善的错误处理、降级机制、FastAPI 异步服务、Streamlit 前端
 
-## 运行说明
+---
 
-### 1. 环境准备
+## 项目结构
+
+```
+smart-ops-assistant/
+├── backend/
+│   ├── agent.py          # LangChain 增强版智能体（核心）
+│   ├── main.py           # FastAPI API 服务
+│   ├── tools.py          # 底层系统监控工具函数
+│   └── test.py           # 完整功能测试套件
+├── frontend/
+│   └── app.py            # Streamlit 聊天界面
+├── docs/                 # 文档目录
+├── opencalw_integration.py  # 自动化运维扩展示例（OpenCALW 风格）
+├── requirements.txt      # 项目依赖
+├── 智谱API配置指南.md    # 智谱 API 申请和配置说明
+└── README.md
+```
+
+---
+
+## 快速开始
+
+### 1. 安装依赖
+
 ```bash
-# 克隆项目
-git clone <仓库地址>
-cd smart-ops-assistant
-
-# 创建虚拟环境
-python -m venv venv
-# Windows激活
-venv\Scripts\activate
-# Linux/Mac激活
-source venv/bin/activate
-
-# 安装依赖
+# 建议使用 Python 3.10 ~ 3.12（LangChain 兼容性最佳）
 pip install -r requirements.txt
 ```
 
-### 2. 配置智谱API Key
-1. 获取智谱API Key：
-   - 访问智谱AI开放平台：https://open.bigmodel.cn/
-   - 注册账号并登录
-   - 在控制台创建API Key，可获得免费额度
+### 2. 配置 API Key
 
-2. 配置项目：
-```bash
-# 复制环境变量模板
-cp .env.example .env
-```
+在项目根目录创建 `.env` 文件：
 
-3. 编辑.env文件，填入你的智谱API配置：
 ```ini
-# 智谱API配置
-ZHIPUAI_API_KEY=你的智谱API_Key_这里
-ZHIPUAI_MODEL=glm-4  # 可选：glm-4, glm-4v, glm-3-turbo, charglm-3
+ZHIPUAI_API_KEY=你的智谱API_Key
+ZHIPUAI_MODEL=glm-4
 ```
 
-4. 验证配置：
-```bash
-python 快速测试.py
-```
+获取 API Key：https://open.bigmodel.cn/（注册即有免费额度）
 
-### 3. 启动服务（推荐方式）
+详细配置说明见：[智谱API配置指南.md](./智谱API配置指南.md)
 
-#### 方法一：优化版AI智能体（使用智谱API）
+### 3. 启动后端服务
+
 ```bash
-# 启动优化版AI智能体服务
 cd backend
-python main_zhipuai.py
-# 服务运行在 http://localhost:8000
-# API文档：http://localhost:8000/docs
+python main.py
 ```
 
-#### 方法二：简化版（无AI依赖）
-```bash
-# 启动简化版服务（无AI智能体）
-cd backend
-python main_simple.py
-# 服务运行在 http://localhost:8001
-```
+服务启动后访问：
+- API 文档：http://localhost:8000/docs
+- 根路径：http://localhost:8000
 
-#### 方法三：快速启动（Windows）
-```bash
-# 双击运行 快速启动.bat
-```
+### 4. 启动前端界面（可选）
 
-#### 方法四：前端服务
 ```bash
-# 启动前端服务（新终端）
 cd frontend
 streamlit run app.py
-# 服务运行在 http://localhost:8501
 ```
 
-## 项目结构（优化后）
-```
-smart-ops-assistant/
-├── backend/                  # 后端代码
-│   ├── agent_zhipuai.py     # 智谱AI智能体（优化版）
-│   ├── main_zhipuai.py      # AI智能体API服务（优化版）
-│   ├── main_simple.py       # 简化版API服务（备选）
-│   └── tools.py             # 工具函数模块
-├── frontend/                # 前端代码
-│   └── app.py              # Streamlit聊天界面
-├── docs/                   # 文档目录
-├── .env                   # 环境变量配置
-├── .env.example           # 环境变量模板
-├── requirements.txt       # 项目依赖
-├── README.md             # 项目说明
-├── 快速启动.bat           # Windows一键启动
-├── 快速测试.py           # 快速测试脚本
-├── 手动测试指南.md        # 详细测试文档
-├── 智谱API配置指南.md     # API配置说明
-├── 项目架构与修改总结.md   # 架构设计文档
-└── 依赖检查和项目状态报告.md # 项目状态报告
+访问：http://localhost:8501
+
+---
+
+## API 使用
+
+### 对话接口
+
+```bash
+POST /chat
 ```
 
-## 已清理的冗余文件
-- `test_agent_simple.py`, `test_api.py`, `test_tools.py`
-- `test_zhipuai_simple.py`, `start_test.py`
-- `backend/agent.py`, `backend/main.py`
-- `测试智谱AI智能体.py`
+```json
+{
+  "text": "CPU使用率怎么样？",
+  "thread_id": "user_123"
+}
+```
 
-## 核心文件说明
-1. **`agent_zhipuai.py`** - 真正的AI智能体，支持自然语言理解
-2. **`main_zhipuai.py`** - 优化API服务，减少冗余输出
-3. **`tools.py`** - 服务器监控工具函数
-4. **`快速测试.py`** - 无需启动服务器的完整功能测试
+`thread_id` 相同则共享对话记忆（支持多轮上下文）。
+
+**响应示例：**
+
+```json
+{
+  "response": "当前CPU使用率为 12.5%，系统运行正常。",
+  "agent_type": "完整LangChain增强版智能体",
+  "processing_time": 2.341,
+  "thread_id": "user_123"
+}
+```
+
+### 其他接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/info` | 查看智能体信息（工具列表、版本等） |
+| GET | `/health` | 系统健康检查（CPU/内存/磁盘） |
+| GET | `/tools` | 可用工具列表 |
+| GET | `/conversation/{thread_id}` | 获取对话历史 |
+| DELETE | `/conversation/{thread_id}` | 清除对话历史 |
+
+### Python 直接调用
+
+```python
+from backend.agent import ask_full_langchain_agent
+
+# 单次调用
+response = ask_full_langchain_agent("分析系统健康状态")
+print(response)
+
+# 多轮对话（相同 thread_id 保留上下文）
+ask_full_langchain_agent("我叫张三", thread_id="session_1")
+ask_full_langchain_agent("我刚才说我叫什么？", thread_id="session_1")  # 会记住"张三"
+```
+
+---
+
+## 核心模块说明
+
+### `backend/agent.py` — LangChain 智能体
+
+- `FullLangChainAgent`：完整 LangChain ReAct 智能体（单例）
+- `ask_full_langchain_agent(question, thread_id)`：便捷调用函数
+- 内置 5 个工具：CPU 监控、内存监控、服务状态、系统信息、健康分析
+- 使用 `InMemorySaver` 维护多轮对话上下文
+
+### `backend/tools.py` — 底层工具函数
+
+- `get_cpu_usage() -> float`：返回 CPU 使用率（%）
+- `get_memory_usage() -> dict`：返回内存详情（used_gb, total_gb, percent 等）
+- `check_service_status(service_name) -> str`：检查服务/进程是否运行
+
+### `backend/main.py` — FastAPI 服务
+
+- 所有路由均基于完整 LangChain 智能体
+- 支持后台日志记录、CORS 跨域、Pydantic 数据校验
+
+### `opencalw_integration.py` — 扩展示例
+
+展示如何将 **自动化运维工具**（文件操作、定时任务、自动修复）集成进 LangChain 工具链。参考此文件开发新工具，然后注册到 `agent.py` 的工具列表即可。
+
+---
+
+## 扩展开发（添加新工具）
+
+1. 在 `tools.py` 或新文件中实现底层函数
+2. 在 `agent.py` 中用 `@langchain_tool` 装饰器包装
+3. 添加到 `FullLangChainAgent._initialize_components()` 的 `self.tools` 列表
+4. 在 `test.py` 中添加测试用例
+
+```python
+# 示例：添加磁盘清理工具
+from langchain.tools import tool as langchain_tool
+
+@langchain_tool
+def clean_temp_files_tool() -> str:
+    """清理系统临时文件，释放磁盘空间。"""
+    # 实现清理逻辑
+    ...
+```
+
+---
+
+## 测试
+
+```bash
+cd backend
+python test.py
+```
+
+测试内容包括：工具函数、智能体初始化、系统监控查询、多轮对话记忆。
+
+---
+
+## 故障排除
+
+### 智能体初始化失败
+
+检查 `.env` 文件中的 `ZHIPUAI_API_KEY` 是否填写且有效。
+
+### LangChain / langgraph 版本问题
+
+```bash
+pip install --upgrade langchain langchain-openai langgraph
+```
+
+### Python 版本
+
+推荐 **Python 3.10 ~ 3.12**。如使用 Python 3.13，确保 `numpy>=2.0.0`。
+
+---
+
+## 技术栈
+
+| 组件 | 版本要求 | 用途 |
+|------|---------|------|
+| Python | 3.10+ | 运行环境 |
+| LangChain | >=0.1.0 | AI 智能体框架 |
+| LangGraph | >=0.1.0 | ReAct + 对话记忆 |
+| langchain-openai | >=0.0.5 | OpenAI 兼容接口 |
+| 智谱 GLM-4 | - | 大语言模型 |
+| FastAPI | >=0.104 | API 服务框架 |
+| Streamlit | >=1.29 | 前端界面 |
+| psutil | >=5.9 | 系统监控 |
+
+---
+
+**项目状态**: 生产就绪 | **AI 框架**: LangChain 增强版 | **扩展性**: 支持 OpenCALW 等自动化工具
